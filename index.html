@@ -1,0 +1,219 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>MST Visualization - Prim's and Kruskal's Algorithms</title>
+    <script src="https://d3js.org/d3.v7.min.js"></script>
+    <style>
+        body { font-family: Arial, sans-serif; display: flex; justify-content: space-around; }
+        .node { fill: #69b3a2; cursor: pointer; }
+        .link { stroke: #999; stroke-opacity: 0.6; }
+        .mst { stroke: red; stroke-width: 2; }
+        .tooltip { position: absolute; text-align: center; padding: 4px; background: lightsteelblue; border: 1px solid #ccc; border-radius: 4px; }
+        .container { width: 400px; height: 600px; position: relative; }
+    </style>
+</head>
+<body>
+    <div class="container" id="prim-container">
+        <h2>Prim's Algorithm</h2>
+        <svg width="400" height="600"></svg>
+    </div>
+    <div class="container" id="kruskal-container">
+        <h2>Kruskal's Algorithm</h2>
+        <svg width="400" height="600"></svg>
+    </div>
+    <div class="tooltip" style="display: none;"></div>
+
+    <script>
+        const nodes = [
+            { id: 'A', x: 100, y: 100 },
+            { id: 'B', x: 300, y: 100 },
+            { id: 'C', x: 100, y: 300 },
+            { id: 'D', x: 300, y: 300 }
+        ];
+
+        const links = [
+            { source: 'A', target: 'B', weight: 5 },
+            { source: 'A', target: 'C', weight: 10 },
+            { source: 'B', target: 'C', weight: 2 },
+            { source: 'B', target: 'D', weight: 1 },
+            { source: 'C', target: 'D', weight: 3 }
+        ];
+
+        const svgPrim = d3.select("#prim-container svg");
+        const svgKruskal = d3.select("#kruskal-container svg");
+        const tooltip = d3.select(".tooltip");
+
+        function renderGraph(svg, links, nodes) {
+            svg.selectAll(".link").remove();
+            svg.selectAll(".node").remove();
+
+            // Draw links
+            const link = svg.selectAll(".link")
+                .data(links)
+                .enter().append("line")
+                .attr("class", "link")
+                .attr("x1", d => getNodeX(d.source))
+                .attr("y1", d => getNodeY(d.source))
+                .attr("x2", d => getNodeX(d.target))
+                .attr("y2", d => getNodeY(d.target))
+                .on("mouseover", function(event, d) {
+                    tooltip.style("display", "block").html(`Weight: ${d.weight}`);
+                })
+                .on("mousemove", function(event) {
+                    tooltip.style("left", (event.pageX + 5) + "px")
+                           .style("top", (event.pageY - 28) + "px");
+                })
+                .on("mouseout", function() {
+                    tooltip.style("display", "none");
+                });
+
+            // Draw nodes
+            const node = svg.selectAll(".node")
+                .data(nodes)
+                .enter().append("circle")
+                .attr("class", "node")
+                .attr("r", 8)
+                .attr("cx", d => d.x)
+                .attr("cy", d => d.y)
+                .call(d3.drag()
+                    .on("start", dragstarted)
+                    .on("drag", dragged)
+                    .on("end", dragended));
+
+            svg.selectAll(".node-text")
+                .data(nodes)
+                .enter().append("text")
+                .attr("class", "node-text")
+                .attr("x", d => d.x)
+                .attr("y", d => d.y - 10)
+                .text(d => d.id)
+                .attr("text-anchor", "middle");
+        }
+
+        function getNodeX(id) {
+            const node = nodes.find(n => n.id === id);
+            return node ? node.x : 0;
+        }
+
+        function getNodeY(id) {
+            const node = nodes.find(n => n.id === id);
+            return node ? node.y : 0;
+        }
+
+        function dragstarted(event) {
+            d3.select(this).raise().classed("active", true);
+        }
+
+        function dragged(event) {
+            const id = d3.select(this).data()[0].id;
+            nodes.find(n => n.id === id).x = event.x;
+            nodes.find(n => n.id === id).y = event.y;
+            renderGraphs();
+        }
+
+        function dragended(event) {
+            d3.select(this).classed("active", false);
+        }
+
+        function primsAlgorithm() {
+            const selectedEdges = [];
+            const connectedNodes = new Set();
+            const minEdges = [...links].sort((a, b) => a.weight - b.weight);
+
+            connectedNodes.add(nodes[0].id); // Start from the first node
+
+            while (connectedNodes.size < nodes.length) {
+                for (const edge of minEdges) {
+                    if (connectedNodes.has(edge.source) && !connectedNodes.has(edge.target)) {
+                        selectedEdges.push(edge);
+                        connectedNodes.add(edge.target);
+                        break;
+                    } else if (connectedNodes.has(edge.target) && !connectedNodes.has(edge.source)) {
+                        selectedEdges.push(edge);
+                        connectedNodes.add(edge.source);
+                        break;
+                    }
+                }
+            }
+
+            // Highlight selected edges as MST
+            svgPrim.selectAll(".mst").remove(); // Clear previous MST
+            svgPrim.selectAll(".link")
+                .data(selectedEdges)
+                .enter().append("line")
+                .attr("class", "mst")
+                .attr("x1", d => getNodeX(d.source))
+                .attr("y1", d => getNodeY(d.source))
+                .attr("x2", d => getNodeX(d.target))
+                .attr("y2", d => getNodeY(d.target));
+        }
+
+        function kruskalsAlgorithm() {
+            const selectedEdges = [];
+            const parent = {};
+            const rank = {};
+            const edges = [...links].sort((a, b) => a.weight - b.weight);
+
+            function find(node) {
+                if (parent[node] !== node) {
+                    parent[node] = find(parent[node]);
+                }
+                return parent[node];
+            }
+
+            function union(node1, node2) {
+                const root1 = find(node1);
+                const root2 = find(node2);
+                if (root1 !== root2) {
+                    if (rank[root1] > rank[root2]) {
+                        parent[root2] = root1;
+                    } else if (rank[root1] < rank[root2]) {
+                        parent[root1] = root2;
+                    } else {
+                        parent[root2] = root1;
+                        rank[root1]++;
+                    }
+                }
+            }
+
+            // Initialize union-find structure
+            nodes.forEach(node => {
+                parent[node.id] = node.id;
+                rank[node.id] = 0;
+            });
+
+            // Kruskal's algorithm
+            edges.forEach(edge => {
+                const { source, target } = edge;
+                if (find(source) !== find(target)) {
+                    selectedEdges.push(edge);
+                    union(source, target);
+                }
+            });
+
+            // Highlight selected edges as MST
+            svgKruskal.selectAll(".mst").remove(); // Clear previous MST
+            svgKruskal.selectAll(".link")
+                .data(selectedEdges)
+                .enter().append("line")
+                .attr("class", "mst")
+                .attr("x1", d => getNodeX(d.source))
+                .attr("y1", d => getNodeY(d.source))
+                .attr("x2", d => getNodeX(d.target))
+                .attr("y2", d => getNodeY(d.target));
+        }
+
+        function renderGraphs() {
+            renderGraph(svgPrim, links, nodes);
+            renderGraph(svgKruskal, links, nodes);
+            primsAlgorithm();
+            kruskalsAlgorithm();
+        }
+
+        // Initial render
+        renderGraphs();
+    </script>
+</body>
+</html>
