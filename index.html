@@ -129,10 +129,10 @@
                 const x = centerX + radius * Math.cos(angle);
                 const y = centerY + radius * Math.sin(angle);
                 positions[node] = { x, y };
-                ctx.fillText(node, x - 10, y - 10); // Draw node label
+                ctx.fillText(node + (index === 0 ? " (origin)" : ""), x - 15, y - 10); // Draw node label with "origin" for the first node
             });
 
-            // Draw edges of the original graph
+            // Draw edges of the original graph and display weights
             for (const node in graph) {
                 graph[node].forEach(edge => {
                     if (positions[edge.to]) {
@@ -141,6 +141,11 @@
                         ctx.lineTo(positions[edge.to].x, positions[edge.to].y);
                         ctx.strokeStyle = 'gray';
                         ctx.stroke();
+                        
+                        // Draw weight label above the edge
+                        const midX = (positions[node].x + positions[edge.to].x) / 2;
+                        const midY = (positions[node].y + positions[edge.to].y) / 2;
+                        ctx.fillText(edge.weight, midX, midY - 5);
                     }
                 });
             }
